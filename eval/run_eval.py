@@ -1,4 +1,4 @@
-"""Compare semantic retrieval, hard-filtered retrieval, and the full hybrid ranker."""
+"""Compare the retrieval baseline, hard-filtered retrieval, and hybrid ranking."""
 import json
 import math
 import sys
@@ -51,7 +51,7 @@ def evaluate(stage: str, k: int = 5) -> dict:
 
 if __name__ == "__main__":
     print(f"Evaluation on {len(labels)} graded profile/job pairs; {len(profiles)} profiles, {len(jobs)} postings.")
-    print("Fixture source: illustrative demo postings; not live listing performance.")
+    print("Fixture source: 10 synthetic demo postings; not live listing performance.")
     print(json.dumps({
         "embeddings_only": evaluate("embeddings_only"),
         "embeddings_plus_filters": evaluate("embeddings_plus_filters"),

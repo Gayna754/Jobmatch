@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .core import add_turn, get_jobs, get_profile, history, search_jobs, update_preferences
+from .llm import create_llm_client, llm_enabled
 
 app = FastAPI(
     title="JobMatch API",
@@ -106,8 +107,18 @@ PREFERENCE_TOOL = {
                 "preferred_locations": {"type": "array", "items": {"type": "string"}},
                 "preferred_work_modes": {"type": "array", "items": {"type": "string"}},
                 "seniority": {"type": "string"},
-                "hard_constraints": {"type": "object", "additionalProperties": {"type": "boolean"}},
-            }, "additionalProperties": False,
+                "hard_constraints": {
+                    "type": "object",
+                    "description": "Boolean allow/deny values. Use false for explicit deal-breakers.",
+                    "properties": {
+                        "unpaid": {"type": "boolean"},
+                        "sales": {"type": "boolean"},
+                        "frontend_heavy": {"type": "boolean"},
+                        "commission-only": {"type": "boolean"},
+                        "on-site": {"type": "boolean"},
+                    },
+                },
+            },
         },
     },
 }
@@ -127,15 +138,14 @@ def run_agent(user_id: str, message: str) -> tuple[str, list[dict[str, Any]] | N
     patch = extract_preferences(message)
     if patch:
         update_preferences(user_id, patch)
-    if not os.getenv("OPENAI_API_KEY"):
+    if not llm_enabled():
         if re.search(r"\b(find|search|show|recommend|match)\b", message, re.I):
             results = search_jobs(user_id, 5)
             return (f"I found {len(results)} matches. Your saved constraints were applied.", results)
         return ("I saved your preferences. Ask me to find jobs when you’re ready.", None)
 
     try:
-        from openai import OpenAI
-        client = OpenAI()
+        client, model = create_llm_client()
         messages = [{
             "role": "system",
             "content": (
@@ -147,7 +157,7 @@ def run_agent(user_id: str, message: str) -> tuple[str, list[dict[str, Any]] | N
         results = None
         for _ in range(3):
             response = client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), messages=messages,
+                model=model, messages=messages,
                 tools=[PREFERENCE_TOOL, SEARCH_TOOL], tool_choice="auto", temperature=0.2,
             )
             assistant = response.choices[0].message
@@ -168,13 +178,14 @@ def run_agent(user_id: str, message: str) -> tuple[str, list[dict[str, Any]] | N
     except Exception as exc:
         # Log only the exception class: SDK error messages can echo fragments of a bad key.
         error_type = type(exc).__name__
-        logger.error("OpenAI agent request failed (%s)", error_type)
+        provider = os.getenv("LLM_PROVIDER", "openai").lower()
+        logger.error("%s agent request failed (%s)", provider, error_type)
         if error_type == "AuthenticationError":
-            detail = "OpenAI rejected the API key. Check that the replacement key was entered correctly."
+            detail = f"{provider.title()} rejected the API key. Check the configured provider key."
         elif error_type in {"RateLimitError", "InsufficientQuotaError"}:
-            detail = "The API request hit a quota or rate limit. Check API billing, credits, and project limits."
+            detail = f"The {provider.title()} request hit a quota or rate limit. Check the provider's current limits."
         elif error_type in {"APIConnectionError", "APITimeoutError"}:
-            detail = "Could not reach the OpenAI API. Check the network and try again."
+            detail = f"Could not reach the {provider.title()} API. Check the network and try again."
         else:
             detail = f"The API request failed ({error_type}). Check the server terminal for its status."
         return (f"I saved your preferences locally, but the model call failed. {detail}", None)
@@ -183,8 +194,9 @@ def run_agent(user_id: str, message: str) -> tuple[str, list[dict[str, Any]] | N
 @app.get("/health", tags=["System"])
 def health() -> dict[str, Any]:
     database = "postgresql" if os.getenv("DATABASE_URL", "").startswith(("postgresql", "postgres://")) else "sqlite"
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
     return {"status": "ok", "job_count": len(get_jobs()), "database": database,
-            "llm_enabled": bool(os.getenv("OPENAI_API_KEY"))}
+            "llm_enabled": llm_enabled(), "llm_provider": provider if llm_enabled() else None}
 
 
 @app.post("/chat", tags=["Conversation"])

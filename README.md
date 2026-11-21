@@ -4,7 +4,7 @@ JobMatch is a Python service that turns a candidate's chat into a persistent str
 
 ## End-to-end flow
 
-1. `/chat` receives a user message. An OpenAI tool-calling agent is enabled when `OPENAI_API_KEY` is set; a local parser supports a basic demo without a key.
+1. `/chat` receives a user message. An OpenAI-compatible tool-calling agent can use OpenAI or Gemini when its provider key is configured; a local parser supports a basic demo without a key.
 2. The agent updates a profile with `preferred_roles`, `preferred_skills`, `preferred_locations`, `preferred_work_modes`, `seniority`, and `hard_constraints`.
 3. Profiles, conversation turns, and jobs are stored in PostgreSQL when `DATABASE_URL` is set. SQLite is the zero-configuration local fallback.
 4. Importers collect and clean postings from Remotive and Hacker News monthly “Who is hiring?” threads.
@@ -47,17 +47,20 @@ python migrate_sqlite_to_postgres.py --confirm
 
 The migration copies profiles, jobs, and conversation turns from `data/jobmatch.sqlite3`. It is intended to be run once against an empty PostgreSQL database.
 
-### Enable LLM chat and explanations
+### Enable optional LLM chat and explanations
 
-Install the optional SDK and set a key in the same PowerShell window used to launch the API:
+Install the optional OpenAI-compatible SDK, then select one provider and set its key in the same PowerShell window used to launch the API. For Gemini:
 
 ```powershell
 python -m pip install -r requirements-llm.txt
-$env:OPENAI_API_KEY = "your-key"
-$env:OPENAI_MODEL = "gpt-4o-mini"
+$env:LLM_PROVIDER = "gemini"
+$env:GEMINI_API_KEY = "your-Gemini-AI-Studio-key"
+$env:LLM_MODEL = "gemini-3.8-flash"
 ```
 
-Without the key, the local parser, deterministic filters, retrieval, ranker, and source-sentence explanations still work.
+Google currently lists free input and output tokens for select Gemini models, subject to provider limits and terms. On the free tier, prompts may be used to improve Google products; do not send sensitive personal information. Check the current [Gemini API pricing and tier details](https://ai.google.dev/gemini-api/docs/pricing) before configuring a key. This service makes no provider calls unless the matching provider key is set.
+
+For OpenAI, use `$env:LLM_PROVIDER = "openai"`, `$env:OPENAI_API_KEY = "your-key"`, and optionally `$env:OPENAI_MODEL = "gpt-4o-mini"`. Without a key, the local parser, deterministic filters, retrieval, ranker, and source-sentence explanations still work. `GET /health` reports the selected provider and whether a key is configured.
 
 ### Enable semantic embeddings
 
@@ -116,11 +119,11 @@ The 30 graded pairs (3 profiles × 10 illustrative postings) compare:
 
 | Pipeline stage | Recall@5 | NDCG@5 | Constraint violations | Evidence faithfulness |
 |---|---:|---:|---:|---:|
-| Embeddings only | 0.806 | 0.894 | 0.400 | 1.000 |
-| Embeddings + hard filters | 1.000 | 0.991 | 0.000 | 1.000 |
-| Embeddings + filters + hybrid ranker | 1.000 | 1.000 | 0.000 | 1.000 |
+| Hashed unigram/bigram cosine retrieval | 0.806 | 0.894 | 0.400 | 1.000 |
+| Retrieval + hard filters | 1.000 | 0.991 | 0.000 | 1.000 |
+| Retrieval + filters + hybrid ranker | 1.000 | 1.000 | 0.000 | 1.000 |
 
-These are reproducible results on the **illustrative demo fixture**, using the offline hashed n-gram fallback; they are not live-job performance or evidence that the current weights generalize. For a credible portfolio evaluation, collect a permitted snapshot of real postings, label relevance before inspecting rankings, and report its source, date, sample size, and annotation method. The evaluation suite reads checked-in fixture labels from `eval/labels.json`.
+These results use **10 synthetic demo postings** and 30 hand-assigned relevance judgments (3 profiles × 10 postings), with the offline hashed unigram/bigram cosine-similarity fallback. The hybrid ranker reaches NDCG@5 1.000 versus 0.894 for retrieval alone on this small sanity-check fixture; the set has no held-out split and is not a live-job performance claim. The labels are in `eval/labels.json`.
 
 ## Project layout
 
@@ -142,6 +145,6 @@ docker-compose.yml   Local PostgreSQL for development
 
 ## Suggested CV wording
 
-**JobMatch | Python, FastAPI, PostgreSQL, Sentence Transformers, OpenAI tool calling**
+**JobMatch | Python, FastAPI, PostgreSQL, Docker Compose**
 
-Built a conversational job-matching service with persistent structured preferences, hybrid retrieval, deterministic deal-breaker enforcement, and citation-validated explanations. Added Remotive and Hacker News ingestion plus an evaluation suite comparing semantic retrieval, filtered retrieval, and hybrid reranking across ranking and constraint metrics.
+Built a chat-based job-matching service with persistent structured preferences, hybrid ranking, deterministic deal-breaker filters, and source-grounded explanations. Added Remotive and Hacker News ingestion plus an evaluation harness comparing hashed n-gram retrieval, hard filters, and hybrid reranking.
