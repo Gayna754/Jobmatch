@@ -1,0 +1,5 @@
+[
+ {"id":"ml","skills":["Python","PyTorch","machine learning"],"interests":["recommendation","ranking"],"never_take":["unpaid","sales roles"]},
+ {"id":"data","skills":["Python","SQL","experimentation"],"interests":["product analytics","data science"],"never_take":["unpaid","sales roles"]},
+ {"id":"platform","skills":["Kubernetes","Terraform","AWS"],"interests":["infrastructure","cloud"],"never_take":["unpaid","sales roles"]}
+]

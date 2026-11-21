@@ -1,0 +1,152 @@
+[
+  {
+    "profile_id": "ml",
+    "job_id": "demo-1",
+    "relevance": 2
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-2",
+    "relevance": 1
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-3",
+    "relevance": 0
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-4",
+    "relevance": 0
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-5",
+    "relevance": 1
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-6",
+    "relevance": 1
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-7",
+    "relevance": 0
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-8",
+    "relevance": 0
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-9",
+    "relevance": 0
+  },
+  {
+    "profile_id": "ml",
+    "job_id": "demo-10",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-1",
+    "relevance": 1
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-2",
+    "relevance": 1
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-3",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-4",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-5",
+    "relevance": 2
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-6",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-7",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-8",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-9",
+    "relevance": 0
+  },
+  {
+    "profile_id": "data",
+    "job_id": "demo-10",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-1",
+    "relevance": 1
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-2",
+    "relevance": 1
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-3",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-4",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-5",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-6",
+    "relevance": 2
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-7",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-8",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-9",
+    "relevance": 0
+  },
+  {
+    "profile_id": "platform",
+    "job_id": "demo-10",
+    "relevance": 0
+  }
+]
