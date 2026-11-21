@@ -39,4 +39,7 @@ def create_llm_client() -> tuple[Any, str]:
     client_options: dict[str, Any] = {"api_key": api_key}
     if base_url:
         client_options["base_url"] = base_url
+    # Keep local Swagger requests responsive if a free-tier provider is slow or
+    # rate-limiting. Disable automatic retries so quota errors return promptly.
+    client_options.update({"timeout": 30.0, "max_retries": 0})
     return OpenAI(**client_options), model
