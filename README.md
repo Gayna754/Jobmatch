@@ -150,6 +150,8 @@ python -m eval.score_blind_pool
 
 This reports dev and held-out test metrics separately: NDCG@5, NDCG@10, pooled Recall@10, and the manually judged violation rate for each system. Recall is limited to relevant postings in the candidate pool, not all 956 corpus items. The profile split is fixed in `eval/benchmark_profiles.json`; use dev for tuning and do not tune against test results.
 
+To score a separately saved label file, pass `--labels path\to\labels.csv`. Labels drafted by an assistant or generated heuristically are not independent human judgments; review and correct them before presenting the results as a hand-labeled evaluation.
+
 To prepare 30 explanation examples from held-out profiles, run `python -m eval.build_explanation_audit`, mark each `faithful` yes/no by checking every claim against its linked posting, then run `python -m eval.score_explanation_audit`. This defaults to the local source-grounded explanation fallback and makes no API calls. Add `--use-llm` only if you deliberately want to generate explanations through the configured provider; that may incur API usage.
 
 After grading, `python -m eval.create_error_analysis` exports up to three held-out ranking failures for a written error analysis. Do not use test cases to tune the ranker; use dev results, preserve the original test scores, and gather a fresh untouched test set before publishing any post-fix headline score.

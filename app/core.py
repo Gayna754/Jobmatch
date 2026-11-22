@@ -316,11 +316,13 @@ def violates(job: dict[str, Any], exclusions: list[str] | dict[str, Any]) -> boo
     if isinstance(exclusions, dict):
         exclusions = constraints_as_exclusions(exclusions)
     raw_text = " ".join(str(job.get(key) or "") for key in
-                         ("title", "description", "employment_type", "salary"))
+                         ("title", "description", "location", "employment_type", "salary"))
     text_all = normalized(raw_text)
     title = normalized(job.get("title", ""))
     for raw in exclusions:
         term = normalized(str(raw))
+        if term in {"on site", "onsite"}:
+            term = "on-site"
         if term == "unpaid":
             if any(re.search(r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])", text_all)
                    for word in ALIASES["unpaid"]):

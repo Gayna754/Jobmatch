@@ -11,6 +11,8 @@ eval/real_judgments_to_label.json
 eval/blind_pool.csv
 eval/blind_pool_manifest.json
 eval/blind_pool_results.json
+eval/blind_pool_assistant_labeled.csv
+eval/blind_pool_assistant_results.json
 eval/explanation_audit.csv
 eval/error_analysis.csv
 .pytest_cache/

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import argparse
 import json
 import math
 from collections import defaultdict
@@ -26,9 +27,14 @@ def mean(values: list[float]) -> float | None:
 
 
 def main() -> None:
-    if not LABELS.exists() or not MANIFEST.exists():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--labels", type=Path, default=LABELS,
+                        help="Completed label CSV (defaults to eval/blind_pool.csv).")
+    args = parser.parse_args()
+    labels_path = args.labels if args.labels.is_absolute() else Path.cwd() / args.labels
+    if not labels_path.exists() or not MANIFEST.exists():
         raise SystemExit("Run `python -m eval.build_blind_pool` first.")
-    with LABELS.open(newline="", encoding="utf-8-sig") as stream:
+    with labels_path.open(newline="", encoding="utf-8-sig") as stream:
         rows = list(csv.DictReader(stream))
     for row in rows:
         if row.get("grade") not in {"0", "1", "2"} or row.get("violates_dealbreaker", "").lower() not in {"yes", "no"}:
@@ -63,12 +69,17 @@ def main() -> None:
     report = {split: {system: {metric: mean(values) for metric, values in metrics.items()}
                       for system, metrics in systems.items()}
               for split, systems in per_split.items()}
-    result = {"pool_only": True, "profiles": {pid: info["split"] for pid, info in manifest["profiles"].items()},
+    result = {"pool_only": True, "label_file": str(labels_path),
+              "label_provenance": "reviewed labels; verify provenance in the selected CSV",
+              "profiles": {pid: info["split"] for pid, info in manifest["profiles"].items()},
               "judged_pairs": len(rows), "systems": report}
-    OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    output_path = OUTPUT.with_name("blind_pool_assistant_results.json") if "assistant_labeled" in labels_path.name else OUTPUT
+    if "assistant_labeled" in labels_path.name:
+        result["label_provenance"] = "assistant-generated preliminary labels; not independent human judgments"
+    output_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(f"Scored {len(rows)} pooled judgments; metrics cover pooled postings only.")
     print(json.dumps(report, indent=2))
-    print(f"Saved results to {OUTPUT}.")
+    print(f"Saved results to {output_path}.")
 
 
 if __name__ == "__main__":
