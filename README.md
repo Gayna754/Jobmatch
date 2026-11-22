@@ -136,13 +136,31 @@ These results were rerun with `sentence-transformers/all-MiniLM-L6-v2` and the h
 
 If Sentence Transformers is not installed, the harness reports and uses the hashed n-gram fallback instead; metrics can differ. Do not interpret the synthetic-fixture metrics as measurements of retrieval over the live-posting corpus.
 
-To prepare a real-posting judgment pool, run `python -m eval.prepare_real_eval` after importing postings. This creates an ignored local file, `eval/real_judgments_to_label.json`, containing the top five candidates from semantic retrieval and filtered hybrid ranking for each of three profiles. Review each posting and fill in relevance (`0` = not relevant, `1` = somewhat relevant, `2` = strong match), then run `python -m eval.run_real_eval`. The script requires complete human labels and reports judged-pool Recall@5/NDCG@5; it does not treat unjudged postings as negatives or claim full-corpus recall. The generated file contains posting text excerpts and is intentionally excluded from Git.
+For a held-out evaluation on real postings, first import the local corpus and run:
+
+```powershell
+python -m eval.build_blind_pool
+```
+
+The script uses 10 fixed chat-style profiles (6 dev, 4 test), pools the top 10 postings from hashed n-grams, embeddings, hybrid ranking, and filtered hybrid ranking, merges duplicates, then shuffles the label CSV. It writes `eval/blind_pool.csv` and a separate `eval/blind_pool_manifest.json`. Both are ignored by Git; the manifest reveals each system's candidates, so keep it closed while grading. Use the rubric in `eval/BLIND_EVAL_RUBRIC.md`. Fill `grade` (0 = poor fit, 1 = partial, 2 = strong) and `violates_dealbreaker` (yes/no) for every row, then run:
+
+```powershell
+python -m eval.score_blind_pool
+```
+
+This reports dev and held-out test metrics separately: NDCG@5, NDCG@10, pooled Recall@10, and the manually judged violation rate for each system. Recall is limited to relevant postings in the candidate pool, not all 956 corpus items. The profile split is fixed in `eval/benchmark_profiles.json`; use dev for tuning and do not tune against test results.
+
+To prepare 30 explanation examples from held-out profiles, run `python -m eval.build_explanation_audit`, mark each `faithful` yes/no by checking every claim against its linked posting, then run `python -m eval.score_explanation_audit`. This defaults to the local source-grounded explanation fallback and makes no API calls. Add `--use-llm` only if you deliberately want to generate explanations through the configured provider; that may incur API usage.
+
+After grading, `python -m eval.create_error_analysis` exports up to three held-out ranking failures for a written error analysis. Do not use test cases to tune the ranker; use dev results, preserve the original test scores, and gather a fresh untouched test set before publishing any post-fix headline score.
+
+The generated CSVs and posting excerpts are local evaluation data and are intentionally excluded from Git. No held-out real-posting results should be claimed until the labels are completed.
 
 ## Project layout
 
 ```text
 app/                 API, persistence, filtering, retrieval, ranking
-eval/                profiles, postings, relevance labels, metrics
+eval/                synthetic fixture, blind real-posting pool, rubric, and metrics
 ingest_remotive.py   Remotive collector and cleaner
 ingest_hn.py         Hacker News hiring-thread collector and cleaner
 migrate_sqlite_to_postgres.py  Local-data migration helper
