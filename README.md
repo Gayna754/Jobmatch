@@ -8,7 +8,7 @@ JobMatch is a Python service that turns a candidate's chat into a persistent str
 2. The agent updates a profile with `preferred_roles`, `preferred_skills`, `preferred_locations`, `preferred_work_modes`, `seniority`, and `hard_constraints`.
 3. Profiles, conversation turns, and jobs are stored in PostgreSQL when `DATABASE_URL` is set. SQLite is the zero-configuration local fallback.
 4. Importers collect and clean postings from Remotive and Hacker News monthly “Who is hiring?” threads.
-5. Sentence Transformers creates normalized posting embeddings. Vectors are cached in process memory and refreshed when the corpus changes. Without the optional model package, a deterministic hashed n-gram fallback is used.
+5. Sentence Transformers creates normalized posting embeddings. A local NPZ index is reused across API restarts and refreshed when the corpus or model changes. Without the optional model package, a deterministic hashed n-gram fallback is used.
 6. Retrieval returns up to 50 candidates.
 7. A deterministic hard-filter stage removes candidates that violate saved constraints. For example, `{"unpaid": false}` excludes unpaid listings.
 8. The hybrid ranker computes an interpretable score from semantic similarity, skills, role, and location:
@@ -70,6 +70,14 @@ python -m pip install -r requirements-ml.txt
 
 The configured Sentence Transformers model downloads the first time it is used. The hashed n-gram fallback remains available for offline development, but is not semantic retrieval.
 
+After installing the optional package and importing postings, build the local vector cache once:
+
+```powershell
+python -m app.index_jobs
+```
+
+This uses `sentence-transformers/all-MiniLM-L6-v2` by default and stores vectors at `data/job_embeddings.npz` (ignored by Git). Set `EMBEDDING_MODEL` to select another Sentence Transformers model. The first model download and first corpus indexing take longer; subsequent API searches reuse the index. To force a refresh, delete the NPZ file and rerun the command.
+
 ### Import postings and start the API
 
 Keep `DATABASE_URL` set in the same PowerShell session when using PostgreSQL:
@@ -119,11 +127,16 @@ The 30 graded pairs (3 profiles × 10 illustrative postings) compare:
 
 | Pipeline stage | Recall@5 | NDCG@5 | Constraint violations | Evidence faithfulness |
 |---|---:|---:|---:|---:|
-| Hashed unigram/bigram cosine retrieval | 0.806 | 0.894 | 0.400 | 1.000 |
-| Retrieval + hard filters | 1.000 | 0.991 | 0.000 | 1.000 |
-| Retrieval + filters + hybrid ranker | 1.000 | 1.000 | 0.000 | 1.000 |
+| Hashed unigram/bigram retrieval | 0.806 | 0.894 | 0.400 | 1.000 |
+| Sentence Transformer retrieval | 0.917 | 0.929 | 0.267 | 1.000 |
+| Sentence Transformers + hard filters | 0.917 | 0.963 | 0.000 | 1.000 |
+| Embeddings + filters + hybrid ranker | 0.917 | 0.963 | 0.000 | 1.000 |
 
-These results use **10 synthetic demo postings** and 30 hand-assigned relevance judgments (3 profiles × 10 postings), with the offline hashed unigram/bigram cosine-similarity fallback. The hybrid ranker reaches NDCG@5 1.000 versus 0.894 for retrieval alone on this small sanity-check fixture; the set has no held-out split and is not a live-job performance claim. The labels are in `eval/labels.json`.
+These results were rerun with `sentence-transformers/all-MiniLM-L6-v2` and the hashed n-gram baseline on **10 synthetic demo postings** and 30 relevance judgments (3 profiles × 10 postings). NDCG@5 increased from 0.894 (hashed n-grams) to 0.929 (embeddings), and to 0.963 after hard filtering. The hybrid weighted scorer tied filtered embeddings on this fixture. Its 0% constraint violation result follows from deterministic filtering and applies to violations detected by the rules; it is not a learned-model gain. This is a sanity-check fixture with no held-out split, separate from the 956 real postings. The labels are in `eval/labels.json`.
+
+If Sentence Transformers is not installed, the harness reports and uses the hashed n-gram fallback instead; metrics can differ. Do not interpret the synthetic-fixture metrics as measurements of retrieval over the live-posting corpus.
+
+To prepare a real-posting judgment pool, run `python -m eval.prepare_real_eval` after importing postings. This creates an ignored local file, `eval/real_judgments_to_label.json`, containing the top five candidates from semantic retrieval and filtered hybrid ranking for each of three profiles. Review each posting and fill in relevance (`0` = not relevant, `1` = somewhat relevant, `2` = strong match), then run `python -m eval.run_real_eval`. The script requires complete human labels and reports judged-pool Recall@5/NDCG@5; it does not treat unjudged postings as negatives or claim full-corpus recall. The generated file contains posting text excerpts and is intentionally excluded from Git.
 
 ## Project layout
 
@@ -138,13 +151,16 @@ docker-compose.yml   Local PostgreSQL for development
 
 ## Limitations and next steps
 
-- PostgreSQL stores durable data; embeddings are currently cached in the API process. For larger or multi-instance deployments, persist vectors in pgvector or use a FAISS index with an explicit refresh job.
+- PostgreSQL stores durable profiles; posting vectors are currently stored in a local NPZ cache. For multi-instance deployments, persist vectors in pgvector or use a shared FAISS index with an explicit refresh job.
 - The current reranker is an interpretable weighted scorer, not a trained learning-to-rank model. Tune weights only on a held-out labeled dataset.
 - Exclusion rules are deterministic but depend on the source fields and phrase patterns. Expand the rule set with labeled false-positive/false-negative examples.
 - A public deployment needs authentication, privacy controls, rate limiting, monitoring, and a defined job-data retention policy.
 
 ## Suggested CV wording
 
-**JobMatch | Python, FastAPI, PostgreSQL, Docker Compose**
+**JobMatch | Python, FastAPI, PostgreSQL, Docker Compose, Gemini, Sentence Transformers**
 
-Built a chat-based job-matching service with persistent structured preferences, hybrid ranking, deterministic deal-breaker filters, and source-grounded explanations. Added Remotive and Hacker News ingestion plus an evaluation harness comparing hashed n-gram retrieval, hard filters, and hybrid reranking.
+- Built a conversational FastAPI job-matching agent using Gemini function calling (`update_preferences`, `search_jobs`) and persistent structured profiles; verified hard constraints carry across chat turns.
+- Ingested and cleaned 956 Hacker News and Remotive postings; implemented local `all-MiniLM-L6-v2` semantic retrieval with a disk-cached vector index and a hybrid skills, role, and location scorer.
+- Enforced deal-breakers with deterministic filters and generated explanations grounded in source-posting text.
+- Compared hashed n-gram retrieval, semantic embeddings, hard filters, and hybrid ranking on 30 judgments; NDCG@5 rose from 0.894 to 0.963, with zero post-filter constraint violations.

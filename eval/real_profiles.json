@@ -1,0 +1,29 @@
+[
+  {
+    "id": "backend_python",
+    "preferred_roles": ["Backend Engineer", "Backend Engineer Intern"],
+    "preferred_skills": ["Python", "distributed systems"],
+    "preferred_locations": [],
+    "preferred_work_modes": ["remote"],
+    "seniority": null,
+    "hard_constraints": {"unpaid": false, "sales": false, "frontend_heavy": false}
+  },
+  {
+    "id": "machine_learning",
+    "preferred_roles": ["Machine Learning Engineer", "Applied Scientist"],
+    "preferred_skills": ["Python", "machine learning", "NLP"],
+    "preferred_locations": [],
+    "preferred_work_modes": ["remote"],
+    "seniority": null,
+    "hard_constraints": {"unpaid": false, "sales": false}
+  },
+  {
+    "id": "platform_cloud",
+    "preferred_roles": ["Platform Engineer", "Cloud Engineer", "DevOps Engineer"],
+    "preferred_skills": ["Python", "Kubernetes", "cloud infrastructure"],
+    "preferred_locations": [],
+    "preferred_work_modes": ["remote"],
+    "seniority": null,
+    "hard_constraints": {"unpaid": false, "sales": false}
+  }
+]

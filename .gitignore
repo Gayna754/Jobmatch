@@ -5,5 +5,8 @@ __pycache__/
 data/*.sqlite3
 data/*.sqlite3-shm
 data/*.sqlite3-wal
+data/*.npz
+data/*.npz.tmp.npz
+eval/real_judgments_to_label.json
 .pytest_cache/
 .cache/

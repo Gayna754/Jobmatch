@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.core import constraints_as_exclusions, grounded_reason, retrieve, rerank, violates
+from app.core import constraints_as_exclusions, embedding_backend, grounded_reason, retrieve, rerank, violates
 
 ROOT = Path(__file__).parent
 profiles = json.loads((ROOT / "profiles.json").read_text(encoding="utf-8"))
@@ -18,10 +18,11 @@ def evaluate(stage: str, k: int = 5) -> dict:
     recalls, ndcgs, violations, faithfulness = [], [], [], []
     for profile in profiles:
         exclusions = constraints_as_exclusions(profile)
-        candidates = retrieve(profile, jobs, 50)
-        if stage != "embeddings_only":
+        backend = "hashed-ngram" if stage == "hashed_ngram_only" else "auto"
+        candidates = retrieve(profile, jobs, 50, backend=backend)
+        if stage in {"embeddings_plus_filters", "embeddings_filters_plus_hybrid_ranker"}:
             candidates = [job for job in candidates if not violates(job, exclusions)]
-        ranked = rerank(profile, candidates) if stage == "hybrid_ranker" else sorted(
+        ranked = rerank(profile, candidates) if stage == "embeddings_filters_plus_hybrid_ranker" else sorted(
             candidates, key=lambda job: -job["semantic_score"]
         )
         top = ranked[:k]
@@ -51,9 +52,11 @@ def evaluate(stage: str, k: int = 5) -> dict:
 
 if __name__ == "__main__":
     print(f"Evaluation on {len(labels)} graded profile/job pairs; {len(profiles)} profiles, {len(jobs)} postings.")
+    print(f"Semantic embedding backend: {embedding_backend()}.")
     print("Fixture source: 10 synthetic demo postings; not live listing performance.")
     print(json.dumps({
+        "hashed_ngram_only": evaluate("hashed_ngram_only"),
         "embeddings_only": evaluate("embeddings_only"),
         "embeddings_plus_filters": evaluate("embeddings_plus_filters"),
-        "embeddings_filters_plus_hybrid_ranker": evaluate("hybrid_ranker"),
+        "embeddings_filters_plus_hybrid_ranker": evaluate("embeddings_filters_plus_hybrid_ranker"),
     }, indent=2))

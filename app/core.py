@@ -383,8 +383,16 @@ def _embedder():
         return None
 
 
-def encode(texts: list[str]) -> np.ndarray:
+def embedding_backend() -> str:
+    """Name the actual retrieval backend for diagnostics and the index command."""
     model = _embedder()
+    if model is None:
+        return "hashed-ngram-fallback"
+    return os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
+
+def encode(texts: list[str], backend: str = "auto") -> np.ndarray:
+    model = None if backend == "hashed-ngram" else _embedder()
     if model is not None:
         return np.asarray(model.encode(texts, normalize_embeddings=True), dtype=np.float32)
     vectors = np.zeros((len(texts), 4096), dtype=np.float32)
@@ -405,12 +413,39 @@ def job_text(job: dict[str, Any]) -> str:
                      ("title", "company", "location", "description", "employment_type", "salary"))
 
 
+def _cached_job_vectors(fingerprint: str, texts: tuple[str, ...], backend: str = "auto") -> np.ndarray:
+    """Load corpus vectors from disk when possible, otherwise encode and persist them."""
+    cache_path = Path(os.getenv("JOB_EMBEDDING_CACHE", "data/job_embeddings.npz"))
+    if not cache_path.is_absolute():
+        cache_path = Path(__file__).resolve().parents[1] / cache_path
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    actual_backend = "hashed-ngram-fallback" if backend == "hashed-ngram" else embedding_backend()
+    cache_key = hashlib.sha256(f"{actual_backend}\n{fingerprint}".encode("utf-8")).hexdigest()
+    try:
+        with np.load(cache_path, allow_pickle=False) as cache:
+            if str(cache["key"].item()) == cache_key:
+                vectors = np.asarray(cache["vectors"], dtype=np.float32)
+                if vectors.ndim == 2 and vectors.shape[0] == len(texts):
+                    return vectors
+    except (OSError, ValueError, KeyError):
+        pass
+
+    vectors = encode(list(texts), backend=backend)
+    temporary_path = cache_path.with_name(f"{cache_path.name}.tmp.npz")
+    np.savez(temporary_path, key=np.asarray(cache_key), vectors=vectors)
+    temporary_path.replace(cache_path)
+    return vectors
+
+
 @lru_cache(maxsize=8)
-def _cached_job_vectors(fingerprint: str, texts: tuple[str, ...]) -> np.ndarray:
-    return encode(list(texts))
+def _memoized_job_vectors(fingerprint: str, texts: tuple[str, ...], backend: str) -> np.ndarray:
+    return _cached_job_vectors(fingerprint, texts, backend)
 
 
-def retrieve(profile: dict[str, Any], jobs: list[dict[str, Any]], k: int = 50) -> list[dict[str, Any]]:
+def retrieve(
+    profile: dict[str, Any], jobs: list[dict[str, Any]], k: int = 50,
+    backend: str = "auto",
+) -> list[dict[str, Any]]:
     if not jobs:
         return []
     shaped = _profile_shape(profile)
@@ -423,8 +458,8 @@ def retrieve(profile: dict[str, Any], jobs: list[dict[str, Any]], k: int = 50) -
         return []
     texts = tuple(job_text(job) for job in jobs)
     fingerprint = hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
-    matrix = _cached_job_vectors(fingerprint, texts)
-    query_vector = encode([query])[0]
+    matrix = _memoized_job_vectors(fingerprint, texts, backend)
+    query_vector = encode([query], backend=backend)[0]
     scores = matrix @ query_vector
     order = np.argsort(-scores, kind="stable")[:k]
     return [{**jobs[int(index)], "semantic_score": float(scores[index])} for index in order]
